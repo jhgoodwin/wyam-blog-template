@@ -1,0 +1,580 @@
+#n Wyam.Common
+#n Wyam.Core
+#n Wyam.Feeds
+#n Wyam.Html
+#n Wyam.Less
+#n Wyam.Markdown
+#n Wyam.Razor
+#n Wyam.Sass
+#n Wyam.Yaml
+#n Wyam.Web
+
+using Wyam.Web.Pipelines;
+
+// Customize your settings and add new ones here
+Settings[Keys.Host] = "host.com";
+Settings[BlogKeys.Title] = "My Blog";
+Settings[BlogKeys.Description] = "Welcome!";
+Settings[BlogKeys.MarkdownConfiguration] = "advanced+bootstrap";
+Settings[BlogKeys.IncludeDateInPostPath] = false;
+Settings[BlogKeys.PostsPath] = new DirectoryPath("posts");
+Settings[BlogKeys.MetaRefreshRedirects] = true;
+Settings[BlogKeys.GenerateArchive] = true;
+Settings[BlogKeys.IndexPageSize] = 3;
+Settings[BlogKeys.RssPath] = Wyam.Feeds.GenerateFeeds.DefaultRssPath;
+Settings[BlogKeys.AtomPath] = Wyam.Feeds.GenerateFeeds.DefaultAtomPath;
+Settings[BlogKeys.RdfPath] = Wyam.Feeds.GenerateFeeds.DefaultRdfPath;
+Settings[BlogKeys.IndexPath] = "index.html";
+Settings[BlogKeys.IndexTemplate] = "_Index.cshtml";
+
+// Add any pipeline customizations here
+// Pages
+Pipelines.Add(
+    nameof(Blog.Pages),
+    Blog.Pages
+);
+// BlogPosts
+Pipelines.Add(
+    nameof(Blog.BlogPosts),
+    Blog.BlogPosts
+);
+// Tags
+Pipelines.Add(
+    nameof(Blog.Tags),
+    Blog.Tags
+);
+// TagIndex
+Pipelines.Add(
+    nameof(Blog.TagIndex),
+    Blog.TagIndex
+);
+// BlogArchive
+Pipelines.Add(
+    nameof(Blog.BlogArchive),
+    Blog.BlogArchive
+);
+// Index
+Pipelines.Add(
+    nameof(Blog.Index),
+    Blog.Index
+);
+// Feed
+Pipelines.Add(
+    nameof(Blog.Feed),
+    Blog.Feed
+);
+// RenderBlogPosts
+Pipelines.Add(
+    nameof(Blog.RenderBlogPosts),
+    Blog.RenderBlogPosts
+);
+// RenderPages
+Pipelines.Add(
+    nameof(Blog.RenderPages),
+    Blog.RenderPages
+);
+// Redirects
+Pipelines.Add(
+    nameof(Blog.Redirects),
+    Blog.Redirects
+);
+// Less
+Pipelines.Add(
+    nameof(Blog.Less),
+    Blog.Less
+);
+// Sass
+Pipelines.Add(
+    nameof(Blog.Sass),
+    Blog.Sass
+);
+// Resources
+Pipelines.Add(
+    nameof(Blog.Resources),
+    Blog.Resources
+);
+// ValidateLinks
+Pipelines.Add(
+    nameof(Blog.ValidateLinks),
+    Blog.ValidateLinks
+);
+// Sitemap
+Pipelines.Add(
+    nameof(Blog.Sitemap),
+    Blog.Sitemap
+);
+
+
+/// <summary>
+/// A recipe for creating blogging websites.
+/// </summary>
+/// <metadata cref="BlogKeys.Title" usage="Setting">The title of the blog.</metadata>
+/// <metadata cref="BlogKeys.Title" usage="Input">The title of the post or page.</metadata>
+/// <metadata cref="BlogKeys.Image" usage="Setting">The relative path to an image to display on the home page.</metadata>
+/// <metadata cref="BlogKeys.Image" usage="Input">The relative path to an image for the current post or page (often shown in the header of the page).</metadata>
+/// <metadata cref="BlogKeys.ProcessIncludes" usage="Setting" />
+/// <metadata cref="BlogKeys.ProcessIncludes" usage="Input" />
+/// <metadata cref="BlogKeys.Description" usage="Setting" />
+/// <metadata cref="BlogKeys.Intro" usage="Setting" />
+/// <metadata cref="BlogKeys.PostsPath" usage="Setting" />
+/// <metadata cref="BlogKeys.CaseInsensitiveTags" usage="Setting" />
+/// <metadata cref="BlogKeys.MarkdownConfiguration" usage="Setting" />
+/// <metadata cref="BlogKeys.MarkdownExtensionTypes" usage="Setting" />
+/// <metadata cref="BlogKeys.IncludeDateInPostPath" usage="Setting" />
+/// <metadata cref="BlogKeys.MetaRefreshRedirects" usage="Setting" />
+/// <metadata cref="BlogKeys.NetlifyRedirects" usage="Setting" />
+/// <metadata cref="BlogKeys.RssPath" usage="Setting" />
+/// <metadata cref="BlogKeys.AtomPath" usage="Setting" />
+/// <metadata cref="BlogKeys.RdfPath" usage="Setting" />
+/// <metadata cref="BlogKeys.ValidateAbsoluteLinks" usage="Setting" />
+/// <metadata cref="BlogKeys.ValidateRelativeLinks" usage="Setting" />
+/// <metadata cref="BlogKeys.ValidateLinksAsError" usage="Setting" />
+/// <metadata cref="BlogKeys.TagPageSize" usage="Setting" />
+/// <metadata cref="BlogKeys.IndexPageSize" usage="Setting" />
+/// <metadata cref="BlogKeys.IndexPaging" usage="Setting" />
+/// <metadata cref="BlogKeys.IndexFullPosts" usage="Setting" />
+/// <metadata cref="BlogKeys.ArchivePageSize" usage="Setting" />
+/// <metadata cref="BlogKeys.ArchiveExcerpts" usage="Setting" />
+/// <metadata cref="BlogKeys.GenerateArchive" usage="Setting" />
+/// <metadata cref="BlogKeys.IgnoreFolders" usage="Setting" />
+/// <metadata cref="BlogKeys.MarkdownPrependLinkRoot" usage="Setting" />
+/// <metadata cref="BlogKeys.Published" usage="Input" />
+/// <metadata cref="BlogKeys.Tags" usage="Input" />
+/// <metadata cref="BlogKeys.Lead" usage="Input" />
+/// <metadata cref="BlogKeys.Excerpt" usage="Output" />
+/// <metadata cref="BlogKeys.ShowInNavbar" usage="Input" />
+/// <metadata cref="BlogKeys.Posts" usage="Output" />
+/// <metadata cref="BlogKeys.Tag" usage="Output" />
+public class Blog : Recipe
+{
+    /// <inheritdoc cref="Web.Pipelines.Pages" />
+    [SourceInfo]
+    public static Pages Pages { get; } = new Pages(
+        nameof(Pages),
+        new PagesSettings
+        {
+            IgnorePaths = ctx =>
+                new[] { ctx.DirectoryPath(BlogKeys.PostsPath)?.FullPath }
+                .Concat(ctx.List(BlogKeys.IgnoreFolders, Array.Empty<string>()))
+                .Where(x => x != null),
+            MarkdownConfiguration = ctx => ctx.String(BlogKeys.MarkdownConfiguration),
+            MarkdownExtensionTypes = ctx => ctx.List<Type>(BlogKeys.MarkdownExtensionTypes),
+            ProcessIncludes = (doc, ctx) => doc.Bool(BlogKeys.ProcessIncludes),
+            PrependLinkRoot = ctx => ctx.Bool(BlogKeys.MarkdownPrependLinkRoot)
+        });
+
+    /// <inheritdoc cref="Web.Pipelines.BlogPosts" />
+    [SourceInfo]
+    public static BlogPosts BlogPosts { get; } = new BlogPosts(
+        nameof(BlogPosts),
+        new BlogPostsSettings
+        {
+            PublishedKey = BlogKeys.Published,
+            MarkdownConfiguration = ctx => ctx.String(BlogKeys.MarkdownConfiguration),
+            MarkdownExtensionTypes = ctx => ctx.List<Type>(BlogKeys.MarkdownExtensionTypes),
+            ProcessIncludes = (doc, ctx) => doc.Bool(BlogKeys.ProcessIncludes),
+            IncludeDateInPostPath = ctx => ctx.Bool(BlogKeys.IncludeDateInPostPath),
+            PostsPath = ctx => ctx.DirectoryPath(BlogKeys.PostsPath, ".").FullPath,
+            PrependLinkRoot = ctx => ctx.Bool(BlogKeys.MarkdownPrependLinkRoot)
+        });
+
+    /// <summary>
+    /// Generates the tag pages for blog posts.
+    /// </summary>
+    [SourceInfo]
+    public static Archive Tags { get; } = new Archive(
+        nameof(Tags),
+        new ArchiveSettings
+        {
+            Pipelines = new string[] { BlogPosts },
+            TemplateFile = ctx => "_Tag.cshtml",
+            Layout = "/_Layout.cshtml",
+            Group = (doc, ctx) => doc.List<string>(BlogKeys.Tags),
+            CaseInsensitiveGroupComparer = ctx => ctx.Bool(BlogKeys.CaseInsensitiveTags),
+            PageSize = ctx => ctx.Get(BlogKeys.TagPageSize, int.MaxValue),
+            Title = (doc, ctx) => doc.String(Keys.GroupKey),
+            RelativePath = (doc, ctx) => $"tags/{doc.String(Keys.GroupKey)}.html",
+            GroupDocumentsMetadataKey = BlogKeys.Posts,
+            GroupKeyMetadataKey = BlogKeys.Tag
+        });
+
+    /// <inheritdoc cref="Pipelines.TagIndex" />
+    [SourceInfo]
+    public static Pipeline TagIndex { get; } = new Pipeline(
+        "TagIndex",
+        new If(
+            ctx => ctx.Documents["Tags"].Any(),
+            new ReadFiles("_Tags.cshtml"),
+            new FrontMatter(
+                new Wyam.Yaml.Yaml()),
+            new Wyam.Razor.Razor()
+                .IgnorePrefix(null)
+                .WithLayout("/_Layout.cshtml"),
+            //new Wyam.Core.Modules.Contents.Shortcodes(),
+            new WriteFiles((doc, ctx) => "tags/index.html"))
+        .WithoutUnmatchedDocuments()
+    );
+
+    /// <summary>
+    /// Generates the index pages for blog posts.
+    /// </summary>
+    [SourceInfo]
+    public static ConditionalPipeline BlogArchive { get; } = new ConditionalPipeline(
+        ctx => ctx.Bool(BlogKeys.GenerateArchive),
+        new Archive(
+            nameof(BlogArchive),
+            new ArchiveSettings
+            {
+                Pipelines = new string[] { BlogPosts },
+                TemplateFile = ctx => "_Archive.cshtml",
+                Layout = "/_Layout.cshtml",
+                PageSize = ctx => ctx.Get(BlogKeys.ArchivePageSize, int.MaxValue),
+                Title = (doc, ctx) => "Archive",
+                RelativePath = (doc, ctx) => $"{ctx.DirectoryPath(BlogKeys.PostsPath, ".").FullPath}"
+            }));
+
+    /// <summary>
+    /// Generates the index page(s).
+    /// </summary>
+    [SourceInfo]
+    public static Archive Index { get; } = new Archive(
+        nameof(Index),
+        new ArchiveSettings
+        {
+            Pipelines = new string[] { BlogPosts },
+            TemplateFile = ctx => ctx.FilePath(BlogKeys.IndexTemplate, "_Index.cshtml"),
+            Layout = "/_Layout.cshtml",
+            PageSize = ctx => ctx.Get(BlogKeys.IndexPageSize, int.MaxValue),
+            WriteIfEmpty = true,
+            TakePages = ctx => ctx.Bool(BlogKeys.IndexPaging) ? int.MaxValue : 1,
+            RelativePath = (doc, ctx) => $"{ctx.DirectoryPath(BlogKeys.IndexPath, ".").FullPath}"
+        });
+
+    /// <inheritdoc cref="Wyam.Web.Pipelines.Feeds" />
+    [SourceInfo]
+    public static Wyam.Web.Pipelines.Feeds Feed { get; } = new Wyam.Web.Pipelines.Feeds(
+        nameof(Feed),
+        new FeedsSettings
+        {
+            Pipelines = new string[] { BlogPosts },
+            RssPath = ctx => ctx.FilePath(BlogKeys.RssPath),
+            AtomPath = ctx => ctx.FilePath(BlogKeys.AtomPath),
+            RdfPath = ctx => ctx.FilePath(BlogKeys.RdfPath)
+        });
+
+    /// <inheritdoc cref="Wyam.Web.Pipelines.RenderBlogPosts" />
+    [SourceInfo]
+    public static RenderBlogPosts RenderBlogPosts { get; } = new RenderBlogPosts(
+        nameof(RenderBlogPosts),
+        new RenderBlogPostsSettings
+        {
+            Pipelines = new string[] { BlogPosts },
+            PublishedKey = BlogKeys.Published,
+            Layout = (doc, ctx) => "/_PostLayout.cshtml"
+        });
+
+    /// <inheritdoc cref="Wyam.Web.Pipelines.RenderPages" />
+    [SourceInfo]
+    public static RenderPages RenderPages { get; } = new RenderPages(
+        nameof(RenderPages),
+        new RenderPagesSettings
+        {
+            Pipelines = new string[] { Pages },
+            Layout = (doc, ctx) => "/_Layout.cshtml"
+        });
+
+    /// <inheritdoc cref="Wyam.Web.Pipelines.Redirects" />
+    [SourceInfo]
+    public static Redirects Redirects { get; } = new Redirects(
+        nameof(Redirects),
+        new RedirectsSettings
+        {
+            Pipelines = new string[] { RenderPages, RenderBlogPosts },
+            MetaRefreshRedirects = ctx => ctx.Bool(BlogKeys.MetaRefreshRedirects),
+            NetlifyRedirects = ctx => ctx.Bool(BlogKeys.NetlifyRedirects)
+        });
+
+    /// <inheritdoc cref="Wyam.Web.Pipelines.Less" />
+    [SourceInfo]
+    public static Wyam.Web.Pipelines.Less Less { get; } = new Wyam.Web.Pipelines.Less(nameof(Less));
+
+    /// <inheritdoc cref="Wyam.Web.Pipelines.Sass" />
+    [SourceInfo]
+    public static Wyam.Web.Pipelines.Sass Sass { get; } = new Wyam.Web.Pipelines.Sass(nameof(Sass));
+
+    /// <inheritdoc cref="Wyam.Web.Pipelines.Resources" />
+    [SourceInfo]
+    public static Resources Resources { get; } = new Resources(nameof(Resources));
+
+    /// <inheritdoc cref="Web.Pipelines.ValidateLinks" />
+    [SourceInfo]
+    public static Wyam.Web.Pipelines.ValidateLinks ValidateLinks { get; } = new Wyam.Web.Pipelines.ValidateLinks(
+        nameof(Wyam.Web.Pipelines.ValidateLinks),
+        new Wyam.Web.Pipelines.ValidateLinksSettings
+        {
+            Pipelines = new string[] { RenderPages, RenderBlogPosts, Resources },
+            ValidateAbsoluteLinks = ctx => ctx.Bool(BlogKeys.ValidateAbsoluteLinks),
+            ValidateRelativeLinks = ctx => ctx.Bool(BlogKeys.ValidateRelativeLinks),
+            ValidateLinksAsError = ctx => ctx.Bool(BlogKeys.ValidateLinksAsError)
+        });
+
+    /// <inheritdoc cref="Wyam.Web.Pipelines.Sitemap" />
+    [SourceInfo]
+    public static Wyam.Web.Pipelines.Sitemap Sitemap { get; } = new Wyam.Web.Pipelines.Sitemap(nameof(Sitemap));
+
+}
+
+/// <summary>
+/// Metadata keys used by the blog recipe.
+/// </summary>
+public static class BlogKeys
+{
+    /// <summary>The title of the blog, post, or page.</summary>
+    /// <type><see cref="string"/></type>
+    public const string Title = nameof(Title);
+
+    /// <summary>The relative path to a page image.</summary>
+    /// <type><see cref="string"/></type>
+    public const string Image = nameof(Image);
+
+    /// <summary>The description of your blog (usually placed on the home page).</summary>
+    /// <type><see cref="string"/></type>
+    public const string Description = nameof(Description);
+
+    /// <summary>
+    /// A short introduction to your blog (usually placed on the home page
+    /// under the description).
+    /// </summary>
+    /// <type><see cref="string"/></type>
+    public const string Intro = nameof(Intro);
+
+    /// <summary>
+    /// Controls the parent path where blog posts are placed. The default is "posts".
+    /// This affects both input and output files (I.e., if you change this your input
+    /// files must also be under the same path).
+    /// </summary>
+    /// <type><see cref="DirectoryPath"/> or <see cref="string"/></type>
+    public const string PostsPath = nameof(PostsPath);
+
+    /// <summary>
+    /// Set to <c>true</c> to make tag groupings case-insensitive.
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string CaseInsensitiveTags = nameof(CaseInsensitiveTags);
+
+    /// <summary>
+    /// Set this to control the activated set of Markdown extensions for the
+    /// Markdig Markdown renderer. The default value is "advanced+bootstrap".
+    /// </summary>
+    /// <type><see cref="string"/></type>
+    public const string MarkdownConfiguration = nameof(MarkdownConfiguration);
+
+    /// <summary>
+    /// Set this to add extension Markdown extensions for the Markdig Markdown
+    /// renderer. The default value is null;
+    /// </summary>
+    /// <type><see cref="IEnumerable{IMarkdownExtension}"/></type>
+    public const string MarkdownExtensionTypes = nameof(MarkdownExtensionTypes);
+
+    /// <summary>
+    /// Indicates that include statements should be processed using the <see cref="Include"/> module.
+    /// The default behavior is not to process includes.
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string ProcessIncludes = nameof(ProcessIncludes);
+
+    /// <summary>
+    /// Setting this to <c>true</c> uses
+    /// the year and date in the output path of blog posts.
+    /// The default value is <c>false</c>.
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string IncludeDateInPostPath = nameof(IncludeDateInPostPath);
+
+    /// <summary>
+    /// Set to <c>true</c> (the default value) to generate meta refresh pages
+    /// for any redirected documents (as indicated by a <c>RedirectFrom</c>
+    /// metadata value in the document).
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string MetaRefreshRedirects = nameof(MetaRefreshRedirects);
+
+    /// <summary>
+    /// Set to <c>true</c> (the default value is <c>false</c>) to generate
+    /// a Netlify <c>_redirects</c> file from redirected documents
+    /// (as indicated by a <c>RedirectFrom</c> metadata value).
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string NetlifyRedirects = nameof(NetlifyRedirects);
+
+    /// <summary>
+    /// Specifies the path of the template file that lists your blog posts
+    /// (which is also typically used as the home page by default).
+    /// By default this setting is "_Index.cshtml". The file path will be used to
+    /// read the index template. If you change it, you are responsible for providing
+    /// this file in your input path (for example, by copying the "_Index.cshtml" from
+    /// a theme to the specified file name in your input folder).
+    /// </summary>
+    /// <type><see cref="FilePath"/> or <see cref="string"/></type>
+    public const string IndexTemplate = nameof(IndexTemplate);
+
+    /// <summary>
+    /// Specifies the output path of the generated index. By default this
+    /// is the home page of your site at "index.html". If you change this
+    /// it lets you provide an alternate home page for your site while still
+    /// generating a list of posts at the specified output location.
+    /// </summary>
+    /// <type><see cref="FilePath"/> or <see cref="string"/></type>
+    public const string IndexPath = nameof(IndexPath);
+
+    /// <summary>
+    /// Specifies the path where the blog RSS file will be output.
+    /// The default value is <c>feed.rss</c>. Set to <c>null</c>
+    /// to prevent generating an RSS feed.
+    /// </summary>
+    /// <type><see cref="FilePath"/> or <see cref="string"/></type>
+    public const string RssPath = nameof(RssPath);
+
+    /// <summary>
+    /// Specifies the path where the blog Atom file will be output.
+    /// The default value is <c>feed.atom</c>. Set to <c>null</c>
+    /// to prevent generating an Atom feed.
+    /// </summary>
+    /// <type><see cref="FilePath"/> or <see cref="string"/></type>
+    public const string AtomPath = nameof(AtomPath);
+
+    /// <summary>
+    /// Specifies the path where the blog RDF file will be output.
+    /// The default value is <c>null</c> which
+    /// prevents generating an RDF feed.
+    /// </summary>
+    /// <type><see cref="FilePath"/> or <see cref="string"/></type>
+    public const string RdfPath = nameof(RdfPath);
+
+    /// <summary>
+    /// Set to <c>true</c> (the default value is <c>false</c>) to
+    /// validate all absolute links. Note that this may add considerable
+    /// time to your generation process.
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string ValidateAbsoluteLinks = nameof(ValidateAbsoluteLinks);
+
+    /// <summary>
+    /// Set to <c>true</c> (the default value) to
+    /// validate all relative links.
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string ValidateRelativeLinks = nameof(ValidateRelativeLinks);
+
+    /// <summary>
+    /// Set to <c>true</c> (the default value is <c>false</c>) to
+    /// report errors on link validation failures.
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string ValidateLinksAsError = nameof(ValidateLinksAsError);
+
+    /// <summary>
+    /// The page size for tag archive pages (if not specified, no paging will be used).
+    /// </summary>
+    /// <type><see cref="int"/></type>
+    public const string TagPageSize = nameof(TagPageSize);
+
+    /// <summary>
+    /// The page size for the index page(s) (if not specified, a default of 3 will be used).
+    /// </summary>
+    /// <type><see cref="int"/></type>
+    public const string IndexPageSize = nameof(IndexPageSize);
+
+    /// <summary>
+    /// Specifies whether index pages should be generated (if not specified or <c>false</c>,
+    /// only the first index page will be generated).
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string IndexPaging = nameof(IndexPaging);
+
+    /// <summary>
+    /// Specifies whether the full post content should be output on the index page(s)
+    /// (if not specified or <c>false</c>, only the excerpt will be output).
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string IndexFullPosts = nameof(IndexFullPosts);
+
+    /// <summary>
+    /// The page size for the archive page (if not specified, no paging will be used).
+    /// </summary>
+    /// <type><see cref="int"/></type>
+    public const string ArchivePageSize = nameof(ArchivePageSize);
+
+    /// <summary>
+    /// Specifies whether the excerpts should be output on the archive page(s)
+    /// (if not specified or <c>false</c>, only the title and description will be displayed).
+    /// Note that this also controls displaying excerpts on the tag archive pages.
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string ArchiveExcerpts = nameof(ArchiveExcerpts);
+
+    /// <summary>
+    /// Specifies whether an archive should be generated (the default is <c>true</c>).
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string GenerateArchive = nameof(GenerateArchive);
+
+    /// <summary>
+    /// The date of the post.
+    /// </summary>
+    /// <type><see cref="DateTime"/> or <see cref="string"/></type>
+    public const string Published = nameof(Published);
+
+    /// <summary>
+    /// The tags for a given post.
+    /// </summary>
+    /// <type><see cref="string"/> or <c>IEnumerable&lt;string&gt;</c></type>
+    public const string Tags = nameof(Tags);
+
+    /// <summary>
+    /// A short description of a particular blog post.
+    /// </summary>
+    /// <type><see cref="string"/></type>
+    public const string Lead = nameof(Lead);
+
+    /// <summary>
+    /// An excerpt of the blog post, automatically set for each document
+    /// by the recipe.
+    /// </summary>
+    /// <type><see cref="string"/></type>
+    public const string Excerpt = nameof(Excerpt);
+
+    /// <summary>
+    /// Set to <c>false</c> to hide a particular page from the top-level navigation bar.
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string ShowInNavbar = nameof(ShowInNavbar);
+
+    /// <summary>
+    /// Set by the recipe for tag groups. Contains the set of documents with a given tag.
+    /// </summary>
+    /// <type><c>IEnumerable&lt;IDocument&gt;</c></type>
+    public const string Posts = nameof(Posts);
+
+    /// <summary>
+    /// Set by the recipe to the name of the tag for each tag group.
+    /// </summary>
+    /// <type><see cref="string"/></type>
+    public const string Tag = nameof(Tag);
+
+    /// <summary>
+    /// This should be a string or array of strings with the name(s)
+    /// of root-level folders to ignore when scanning for content pages.
+    /// Setting this global metadata value is useful when introducing
+    /// your own pipelines for files under certain folders and you don't
+    /// want the primary content page pipelines to pick them up.
+    /// </summary>
+    /// <type><see cref="string"/> or <c>IEnumerable&lt;string&gt;</c></type>
+    public const string IgnoreFolders = nameof(IgnoreFolders);
+
+    /// <summary>
+    /// Set to <c>true</c> to prepend a configured <c>LinkRoot</c> to all root-relative Markdown links.
+    /// </summary>
+    /// <type><see cref="bool"/></type>
+    public const string MarkdownPrependLinkRoot = nameof(MarkdownPrependLinkRoot);
+}
